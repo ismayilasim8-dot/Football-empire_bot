@@ -1,36 +1,53 @@
+# main.py - AIogram 3 minimal bot (polling) for Render
+import asyncio
+import logging
 import os
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
+from aiogram.filters import Command
 from aiogram.types import Message
-from aiogram.utils.executor import start_webhook
 
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Read token from env
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("Environment variable BOT_TOKEN is not set. Exiting.")
+    raise SystemExit("BOT_TOKEN not set")
 
-WEBHOOK_HOST = os.getenv("WEBHOOK_URL")  # URL, который выдаст Render
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = WEBHOOK_HOST + WEBHOOK_PATH
+# Create bot and dispatcher
+bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+dp = Dispatcher()
 
-APP_HOST = "0.0.0.0"
-APP_PORT = int(os.getenv("PORT", 8000))
+# Simple /start handler
+@dp.message(Command(commands=["start"]))
+async def cmd_start(message: Message):
+    user = message.from_user
+    text = (
+        f"Привет, <b>{user.full_name}</b>!\n\n"
+        "Это Football Empire (мини). Бот успешно работает на Aiogram 3 ✅\n\n"
+        "Команды:\n"
+        "/start - это сообщение\n"
+    )
+    await message.answer(text)
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+# Example echo handler (optional)
+@dp.message()
+async def echo_message(message: Message):
+    # простая логика — отвечает тем же текстом
+    # можно удалить или заменить на собственные хендлеры
+    await message.reply(f"Вы написали: {message.text}")
 
-@dp.message_handler(commands=["start"])
-async def start_cmd(msg: Message):
-    await msg.answer("Бот успешно работает! ⚽")
-
-async def on_startup(dp):
-    await bot.set_webhook(WEBHOOK_URL)
-
-async def on_shutdown(dp):
-    await bot.delete_webhook()
+async def main():
+    # Запускаем polling в event loop
+    try:
+        logger.info("Starting bot polling...")
+        await dp.start_polling(bot)
+    finally:
+        logger.info("Shutting down bot...")
+        await bot.session.close()
 
 if __name__ == "__main__":
-    start_webhook(
-        dispatcher=dp,
-        webhook_path=WEBHOOK_PATH,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        host=APP_HOST,
-        port=APP_PORT,
-    )
+    # Запуск через asyncio.run, чтобы корректно завершать сессии
+    asyncio.run(main())
